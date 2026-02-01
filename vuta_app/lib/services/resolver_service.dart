@@ -30,9 +30,11 @@ class ResolverService {
 
   static final Dio _dio = Dio(
     BaseOptions(
-      connectTimeout: const Duration(seconds: 20),
-      receiveTimeout: const Duration(seconds: 60),
-      sendTimeout: const Duration(seconds: 20),
+      // Increased timeouts to handle slow resolver backend operations
+      // Backend may take 30-60s to launch browser, load page, and detect video
+      connectTimeout: const Duration(seconds: 60),
+      receiveTimeout: const Duration(seconds: 120),
+      sendTimeout: const Duration(seconds: 30),
       headers: {
         'content-type': 'application/json',
         'accept': 'application/json',
@@ -69,29 +71,64 @@ class ResolverService {
     final u = (await getConfiguredBaseUrl()).trim();
     if (u.isEmpty) return null;
 
-    final res = await _dio.post<Map<String, dynamic>>(
-      '$u/resolve',
-      data: {
-        'url': pageUrl,
-      },
-      options: Options(responseType: ResponseType.json),
-    );
-
-    final data = res.data;
-    if (data == null) return null;
-
-    final ok = data['ok'] == true;
-    if (!ok) return null;
-
-    final url = data['url'];
-    final type = data['type'];
-    if (url is String && url.trim().isNotEmpty) {
-      return ResolverResult(
-        url: url.trim(),
-        type: type is String && type.trim().isNotEmpty ? type.trim() : 'unknown',
+    try {
+      final res = await _dio.post<Map<String, dynamic>>(
+        '$u/resolve',
+        data: {
+          'url': pageUrl,
+        },
+        options: Options(
+          responseType: ResponseType.json,
+          // Override timeouts for this specific request if needed
+          receiveTimeout: const Duration(seconds: 120),
+          sendTimeout: const Duration(seconds: 30),
+        ),
       );
-    }
 
-    return null;
+      final data = res.data;
+      if (data == null) return null;
+
+      final ok = data['ok'] == true;
+      if (!ok) {
+        final error = data['error'] as String?;
+        throw Exception(error ?? 'Resolver returned error');
+      }
+
+      final url = data['url'];
+      final type = data['type'];
+      if (url is String && url.trim().isNotEmpty) {
+        return ResolverResult(
+          url: url.trim(),
+          type: type is String && type.trim().isNotEmpty ? type.trim() : 'unknown',
+        );
+      }
+
+      return null;
+    } on DioException catch (e) {
+      // Handle specific timeout errors
+      if (e.type == DioExceptionType.connectionTimeout ||
+          e.type == DioExceptionType.receiveTimeout ||
+          e.type == DioExceptionType.sendTimeout) {
+        throw Exception(
+          'Connection timeout. The resolver backend is taking too long to respond. '
+          'This may happen if:\n'
+          '1. The backend is not running\n'
+          '2. The backend URL is incorrect\n'
+          '3. The page is taking too long to load\n'
+          'Try checking your resolver backend settings or wait a bit longer.',
+        );
+      } else if (e.type == DioExceptionType.connectionError) {
+        throw Exception(
+          'Cannot connect to resolver backend. Make sure:\n'
+          '1. The backend is running\n'
+          '2. The URL is correct (check Settings)\n'
+          '3. Your device can reach the backend server',
+        );
+      }
+      rethrow;
+    } catch (e) {
+      // Re-throw with context
+      throw Exception('Resolver error: $e');
+    }
   }
 }
