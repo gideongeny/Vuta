@@ -207,6 +207,21 @@ Output: `build/app/outputs/bundle/release/app-release.aab`
 ### Resolver Backend
 
 #### Local Development
+
+**Windows (Easiest):**
+```powershell
+cd resolver_backend
+.\start_backend.ps1
+```
+
+Or double-click `start_backend.bat`
+
+**Background Mode (Recommended):**
+```powershell
+.\start_backend_background.ps1
+```
+
+**Manual Start:**
 ```bash
 cd resolver_backend
 python server.py
@@ -214,7 +229,10 @@ python server.py
 
 Server runs on `http://localhost:8080` by default.
 
-**Note**: Make sure Python 3.9+ is installed and yt-dlp is available.
+**Note**: Make sure Python 3.9+ is installed. Dependencies will be installed automatically.
+
+**Auto-Start on Windows Login:**
+See `resolver_backend/SETUP_GUIDE.md` for detailed instructions on setting up automatic startup.
 
 #### Docker Deployment
 ```bash
