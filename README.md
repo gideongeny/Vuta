@@ -41,7 +41,8 @@
 - **Night Queue**: Schedule downloads for off-peak hours (Pro feature)
 
 ### 🚀 Advanced Features
-- **Resolver Backend**: Optional Node.js backend for resolving blob URLs and protected streams
+- **Resolver Backend**: Optional Python backend powered by **yt-dlp** (industry-standard extractor used by top Play Store apps)
+- **Wide Platform Support**: Supports 1000+ sites including Instagram, Facebook, TikTok, YouTube, and more
 - **WhatsApp Integration**: Direct sharing to WhatsApp (Pro feature)
 - **Pro Features**: Unlock advanced capabilities with in-app purchases
 - **Ad-Supported**: Free tier with optional ad removal
@@ -61,9 +62,9 @@ VUTA is built with a modern, modular architecture:
 - **Background Tasks**: WorkManager for background processing
 
 ### Backend (Optional Resolver)
-- **Runtime**: Node.js with Express
-- **Browser Automation**: Playwright for headless browser operations
-- **Purpose**: Resolves blob URLs and protected streaming URLs
+- **Runtime**: Python 3.9+ with Flask
+- **Extractor**: yt-dlp (industry-standard, used by top Play Store apps)
+- **Purpose**: Resolves video URLs from social media platforms using proven extraction methods
 
 ### Key Components
 ```
@@ -93,8 +94,9 @@ resolver_backend/
 - **Git** for version control
 
 ### For Resolver Backend (Optional)
-- **Node.js** 18+ and npm
-- **Playwright** browsers (installed automatically)
+- **Python** 3.9 or higher
+- **pip** (Python package manager)
+- **yt-dlp** (installed automatically via requirements.txt)
 
 ### For Building
 - **Gradle** 7.5+ (included in Android project)
@@ -122,7 +124,7 @@ flutter pub get
 
 ```bash
 cd resolver_backend
-npm install
+pip install -r requirements.txt
 ```
 
 ### 4. Configure Android
@@ -207,10 +209,12 @@ Output: `build/app/outputs/bundle/release/app-release.aab`
 #### Local Development
 ```bash
 cd resolver_backend
-npm start
+python server.py
 ```
 
 Server runs on `http://localhost:8080` by default.
+
+**Note**: Make sure Python 3.9+ is installed and yt-dlp is available.
 
 #### Docker Deployment
 ```bash
@@ -218,6 +222,8 @@ cd resolver_backend
 docker build -t vuta-resolver .
 docker run -p 8080:8080 -e RESOLVER_API_KEY=your_key vuta-resolver
 ```
+
+**Note**: The Docker image includes Python, Flask, and yt-dlp pre-installed.
 
 ---
 
@@ -280,6 +286,7 @@ If extraction fails:
   2. Verify URL in app settings matches backend URL
   3. For emulator: use `http://10.0.2.2:8080`
   4. For physical device: use your computer's IP address
+  5. Ensure Python 3.9+ and yt-dlp are installed: `pip install yt-dlp`
 
 #### Build Errors
 
@@ -337,10 +344,11 @@ Vuta/
 │   ├── assets/                   # Images, fonts, etc.
 │   └── pubspec.yaml             # Flutter dependencies
 │
-├── resolver_backend/            # Optional Node.js backend
-│   ├── server.js                # Express server
-│   ├── package.json             # Node dependencies
-│   └── Dockerfile               # Docker configuration
+├── resolver_backend/            # Optional Python backend
+│   ├── server.py                # Flask server with yt-dlp
+│   ├── requirements.txt         # Python dependencies
+│   ├── Dockerfile               # Docker configuration
+│   └── README.md                # Backend documentation
 │
 ├── image/                        # Project images
 └── README.md                     # This file
