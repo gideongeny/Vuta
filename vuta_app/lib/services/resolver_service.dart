@@ -16,12 +16,11 @@ class ResolverService {
 
   static const String _prefsKey = 'resolver_base_url_v1';
 
-  // Default to empty - app will work without backend for direct URLs
-  // For production, deploy backend to cloud and set this URL
-  // See resolver_backend/DEPLOY.md for deployment instructions
+  // Backend is optional - app works entirely client-side
+  // No backend needed! App uses in-app WebView extraction
   static const String baseUrl = String.fromEnvironment(
     'RESOLVER_BASE_URL',
-    defaultValue: '', // Empty by default - users can configure or deploy their own
+    defaultValue: '', // Empty = no backend needed, app works standalone
   );
 
   static const String apiKey = String.fromEnvironment(

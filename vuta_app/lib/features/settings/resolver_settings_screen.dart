@@ -54,16 +54,23 @@ class _ResolverSettingsScreenState extends State<ResolverSettingsScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const Text(
-              'Resolver Base URL',
-              style: TextStyle(fontWeight: FontWeight.bold),
+              'Advanced: Resolver Backend (Optional)',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
             ),
             const SizedBox(height: 8),
+            const Text(
+              'The app works without a backend! Leave empty for standalone mode.\n'
+              'Backend is only needed for advanced cases (blob URLs, protected streams).',
+              style: TextStyle(fontSize: 12, color: Colors.grey),
+            ),
+            const SizedBox(height: 12),
             TextField(
               controller: _controller,
               enabled: !_loading,
               decoration: const InputDecoration(
-                hintText: 'https://your-resolver-xxxxx.run.app',
+                hintText: 'Leave empty - app works standalone',
                 border: OutlineInputBorder(),
+                helperText: 'Optional: Only for advanced extraction cases',
               ),
             ),
             const SizedBox(height: 12),

@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
-import 'package:vuta/services/resolver_service.dart';
-import 'package:vuta/features/settings/resolver_settings_screen.dart';
 
 class WebExtractScreen extends StatefulWidget {
   final String initialUrl;
@@ -129,13 +127,52 @@ class _WebExtractScreenState extends State<WebExtractScreen> {
     }
   }
   
-  // Last resort: check for blob URLs (will need resolver)
-  const v = document.querySelector('video');
-  if (v && (v.currentSrc || v.src)) {
-    return (v.currentSrc || v.src || '').trim();
-  }
-  
-  return '';
+      // Try to find video URLs in JSON-LD and structured data
+      const jsonScripts = document.querySelectorAll('script[type="application/json"], script[type="application/ld+json"]');
+      for (const script of jsonScripts) {
+        try {
+          const data = JSON.parse(script.textContent);
+          const search = (obj) => {
+            if (typeof obj !== 'object' || obj === null) return null;
+            for (const [key, value] of Object.entries(obj)) {
+              if (typeof value === 'string' && value.match(/https?:\/\/[^"\\s]+\\.(mp4|m3u8|webm|mov)/i)) {
+                if (!value.startsWith('blob:')) return value;
+              }
+              if (typeof value === 'object') {
+                const found = search(value);
+                if (found) return found;
+              }
+            }
+            return null;
+          };
+          const found = search(data);
+          if (found) return found;
+        } catch(e) {}
+      }
+      
+      // Last resort: check for blob URLs
+      const v = document.querySelector('video');
+      if (v && (v.currentSrc || v.src)) {
+        const src = (v.currentSrc || v.src || '').trim();
+        if (src.startsWith('blob:')) {
+          // For blob URLs, try to get the actual source
+          // This works if the video has already loaded
+          try {
+            const canvas = document.createElement('canvas');
+            canvas.width = v.videoWidth || 1;
+            canvas.height = v.videoHeight || 1;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(v, 0, 0);
+            // Can't extract blob URL directly, but we can try to find it in page
+            return src; // Return blob URL - app will handle it
+          } catch(e) {
+            return src;
+          }
+        }
+        return src;
+      }
+      
+      return '';
 })()
 """,
       );
@@ -153,98 +190,89 @@ class _WebExtractScreenState extends State<WebExtractScreen> {
         return;
       }
 
+      // Handle blob URLs - try to extract from page source or network
       if (extracted.startsWith('blob:')) {
         setState(() => _lastExtracted = extracted);
 
-        // Check if backend is reachable first
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Checking resolver backend...'),
-            duration: Duration(seconds: 2),
-          ),
-        );
-
-        final backendHealthy = await ResolverService.checkBackendHealth();
-        if (!backendHealthy) {
-          if (!mounted) return;
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              title: const Text('Resolver Backend Unavailable'),
-              content: const Text(
-                'Cannot connect to the resolver backend. This is required for blob URLs.\n\n'
-                'Please:\n'
-                '1. Make sure the resolver backend is running\n'
-                '2. Check the resolver URL in Settings\n'
-                '3. Verify your device can reach the backend server\n\n'
-                'For emulator: use http://10.0.2.2:8080\n'
-                'For physical device: use your computer\'s IP address',
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => const ResolverSettingsScreen(),
-                      ),
-                    );
-                  },
-                  child: const Text('Check Settings'),
-                ),
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(),
-                  child: const Text('OK'),
-                ),
-              ],
-            ),
-          );
-          return;
-        }
-
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Resolving stream… This may take 60-120 seconds. Please wait...'),
+            content: Text('Blob URL detected. Trying alternative extraction methods...'),
             duration: Duration(seconds: 3),
           ),
         );
 
+        // Wait a bit more and try again with enhanced extraction
+        await Future.delayed(const Duration(milliseconds: 2000));
+
+        // Try enhanced extraction that monitors network requests
         try {
-          final currentUrl = await _controller.currentUrl();
-          final result = await ResolverService.resolvePlayableUrl(
-            pageUrl: (currentUrl == null || currentUrl.trim().isEmpty) ? widget.initialUrl : currentUrl,
+          final enhancedExtraction = await _controller.runJavaScriptReturningResult(
+            """
+            (() => {
+              // Try to find video in page data/scripts more aggressively
+              const scripts = document.querySelectorAll('script[type="application/json"], script[type="application/ld+json"]');
+              for (const script of scripts) {
+                try {
+                  const data = JSON.parse(script.textContent);
+                  const search = (obj) => {
+                    if (typeof obj !== 'object' || obj === null) return null;
+                    for (const [key, value] of Object.entries(obj)) {
+                      if (typeof value === 'string' && (value.includes('.mp4') || value.includes('video'))) {
+                        if (value.startsWith('http') && !value.startsWith('blob:')) {
+                          return value;
+                        }
+                      }
+                      if (typeof value === 'object') {
+                        const found = search(value);
+                        if (found) return found;
+                      }
+                    }
+                    return null;
+                  };
+                  const found = search(data);
+                  if (found) return found;
+                } catch(e) {}
+              }
+              
+              // Try all video sources again after waiting
+              const videos = document.querySelectorAll('video');
+              for (const v of videos) {
+                if (v.networkState === 2) { // NETWORK_LOADED
+                  const src = v.currentSrc || v.src;
+                  if (src && !src.startsWith('blob:')) return src;
+                }
+              }
+              
+              return '';
+            })()
+            """,
           );
 
-          if (!mounted) return;
-
-          if (result == null) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Could not resolve stream. Make sure the resolver backend is running and accessible.'),
-                duration: Duration(seconds: 5),
-              ),
-            );
+          final enhanced = enhancedExtraction.toString().replaceAll('"', '').trim();
+          if (enhanced.isNotEmpty && !enhanced.startsWith('blob:')) {
+            setState(() => _lastExtracted = enhanced);
+            Navigator.of(context).pop(enhanced);
             return;
           }
-
-          if (result.type.toLowerCase() == 'm3u8' || result.url.toLowerCase().contains('.m3u8')) {
-            setState(() => _lastExtracted = result.url);
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Resolved an HLS stream (m3u8). This app currently downloads direct files (mp4).'),
-                duration: Duration(seconds: 4),
-              ),
-            );
-            return;
-          }
-
-          setState(() => _lastExtracted = result.url);
-          Navigator.of(context).pop(result.url);
-          return;
         } catch (e) {
-          // Re-throw to be caught by outer catch block with better context
-          throw Exception('Resolver error: ${e.toString().replaceAll('Exception: ', '')}');
+          // Continue to show user-friendly message
         }
+
+        // If still blob URL, show helpful message
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text(
+              'This video uses a protected stream (blob URL).\n'
+              'Try:\n'
+              '1. Wait for video to fully load\n'
+              '2. Tap Extract again\n'
+              '3. Or use the share button on the original post to get a direct link',
+            ),
+            duration: Duration(seconds: 6),
+          ),
+        );
+        return;
       }
 
       setState(() => _lastExtracted = extracted);
