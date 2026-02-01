@@ -67,21 +67,53 @@ class ResolverService {
     _cachedBaseUrl = normalized;
   }
 
+  /// Check if resolver backend is reachable
+  static Future<bool> checkBackendHealth() async {
+    final u = (await getConfiguredBaseUrl()).trim();
+    if (u.isEmpty) return false;
+
+    try {
+      final res = await _dio.get<Map<String, dynamic>>(
+        '$u/health',
+        options: Options(
+          responseType: ResponseType.json,
+          receiveTimeout: const Duration(seconds: 10),
+          sendTimeout: const Duration(seconds: 5),
+        ),
+      );
+      return res.statusCode == 200 && (res.data?['ok'] == true);
+    } catch (_) {
+      return false;
+    }
+  }
+
   static Future<ResolverResult?> resolvePlayableUrl({required String pageUrl}) async {
     final u = (await getConfiguredBaseUrl()).trim();
     if (u.isEmpty) return null;
 
     try {
-      final res = await _dio.post<Map<String, dynamic>>(
-        '$u/resolve',
+      // Create a new Dio instance with extended timeouts for this specific request
+      final dio = Dio(
+        BaseOptions(
+          baseUrl: u,
+          connectTimeout: const Duration(seconds: 90), // Even longer for slow connections
+          receiveTimeout: const Duration(seconds: 180), // 3 minutes for complex pages
+          sendTimeout: const Duration(seconds: 30),
+          headers: {
+            'content-type': 'application/json',
+            'accept': 'application/json',
+            if (apiKey != '') 'authorization': 'Bearer $apiKey',
+          },
+        ),
+      );
+
+      final res = await dio.post<Map<String, dynamic>>(
+        '/resolve',
         data: {
           'url': pageUrl,
         },
         options: Options(
           responseType: ResponseType.json,
-          // Override timeouts for this specific request if needed
-          receiveTimeout: const Duration(seconds: 120),
-          sendTimeout: const Duration(seconds: 30),
         ),
       );
 

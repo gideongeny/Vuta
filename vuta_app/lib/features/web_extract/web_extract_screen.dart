@@ -156,9 +156,55 @@ class _WebExtractScreenState extends State<WebExtractScreen> {
       if (extracted.startsWith('blob:')) {
         setState(() => _lastExtracted = extracted);
 
+        // Check if backend is reachable first
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Resolving stream… This may take 30-60 seconds.'),
+            content: Text('Checking resolver backend...'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+
+        final backendHealthy = await ResolverService.checkBackendHealth();
+        if (!backendHealthy) {
+          if (!mounted) return;
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Resolver Backend Unavailable'),
+              content: const Text(
+                'Cannot connect to the resolver backend. This is required for blob URLs.\n\n'
+                'Please:\n'
+                '1. Make sure the resolver backend is running\n'
+                '2. Check the resolver URL in Settings\n'
+                '3. Verify your device can reach the backend server\n\n'
+                'For emulator: use http://10.0.2.2:8080\n'
+                'For physical device: use your computer\'s IP address',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => const ResolverSettingsScreen(),
+                      ),
+                    );
+                  },
+                  child: const Text('Check Settings'),
+                ),
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('OK'),
+                ),
+              ],
+            ),
+          );
+          return;
+        }
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Resolving stream… This may take 60-120 seconds. Please wait...'),
             duration: Duration(seconds: 3),
           ),
         );
