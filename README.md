@@ -143,11 +143,16 @@ cd vuta_app/android
 ### App Configuration
 
 #### Resolver Backend URL
-The app can connect to an optional resolver backend for advanced video extraction:
+The app works without a backend for direct media URLs. For advanced extraction (Instagram, Facebook, etc.), deploy the backend to cloud:
 
+**Quick Deploy (5 minutes):**
+See `resolver_backend/QUICK_DEPLOY.md` for step-by-step instructions.
+
+**For Users:**
 1. Open the app
 2. Navigate to Settings (gear icon)
-3. Enter your resolver backend URL (default: `http://10.0.2.2:8080` for Android emulator)
+3. Enter your cloud backend URL (if you deployed one)
+4. Or leave empty - app works for direct URLs without backend
 
 #### API Key (Optional)
 If your resolver backend requires authentication:

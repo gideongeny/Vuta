@@ -16,9 +16,12 @@ class ResolverService {
 
   static const String _prefsKey = 'resolver_base_url_v1';
 
+  // Default to empty - app will work without backend for direct URLs
+  // For production, deploy backend to cloud and set this URL
+  // See resolver_backend/DEPLOY.md for deployment instructions
   static const String baseUrl = String.fromEnvironment(
     'RESOLVER_BASE_URL',
-    defaultValue: 'http://10.0.2.2:8080',
+    defaultValue: '', // Empty by default - users can configure or deploy their own
   );
 
   static const String apiKey = String.fromEnvironment(
@@ -49,6 +52,7 @@ class ResolverService {
 
     final prefs = await SharedPreferences.getInstance();
     final stored = prefs.getString(_prefsKey);
+    // If user hasn't configured, use default (empty = no backend, app still works for direct URLs)
     final resolved = (stored == null || stored.trim().isEmpty) ? baseUrl : stored.trim();
     _cachedBaseUrl = resolved;
     return resolved;
